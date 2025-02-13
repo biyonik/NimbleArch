@@ -1,0 +1,6 @@
+@NimbleArch.Api_HostAddress = http://localhost:5209
+
+GET {{NimbleArch.Api_HostAddress}}/
+Accept: application/json
+
+###
