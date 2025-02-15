@@ -10,5 +10,6 @@ public interface IResponseTransformation<T>
     /// <summary>
     /// Response transformation'ı gerçekleştirir.
     /// </summary>
-    Span<byte> Transform(T data, Span<byte> source, ResponseTransformationContext context);
+    byte[] Transform(T data, ReadOnlySpan<byte> source, ResponseTransformationContext context);
+
 }

@@ -15,12 +15,6 @@ public class ResponseTransformationPipeline<T>(IFastSerializable<T> serializer)
         return this;
     }
 
-    private Span<byte> GetCurrentSpan(T data, byte[] initialBuffer)
-    {
-        return new Span<byte>(initialBuffer, 0, 
-            serializer.SerializeToBytes(data, initialBuffer));
-    }
-
     public async Task TransformAndWriteAsync(
         T data,
         Stream outputStream,
@@ -28,22 +22,33 @@ public class ResponseTransformationPipeline<T>(IFastSerializable<T> serializer)
         CancellationToken cancellationToken = default)
     {
         var initialBuffer = context.BufferPool.Rent(serializer.GetRequiredBufferSize(data));
-        var currentSpan = GetCurrentSpan(data: data, initialBuffer);
         try
         {
+            var currentMemory = GetCurrentMemory(data, initialBuffer);
+
             foreach (var transformation in _transformations)
             {
                 if (transformation.ShouldApply(context))
                 {
-                    currentSpan = transformation.Transform(data, currentSpan, context);
+                    // Span'i Memory'ye dönüştür
+                    currentMemory = transformation
+                        .Transform(data, currentMemory.Span, context)
+                        .ToArray()
+                        .AsMemory();
                 }
             }
 
-            await outputStream.WriteAsync(currentSpan.ToArray(), cancellationToken);
+            await outputStream.WriteAsync(currentMemory, cancellationToken);
         }
         finally
         {
             context.BufferPool.Return(initialBuffer);
         }
+    }
+
+    private Memory<byte> GetCurrentMemory(T data, byte[] initialBuffer)
+    {
+        var bytesWritten = serializer.SerializeToBytes(data, initialBuffer);
+        return new Memory<byte>(initialBuffer, 0, bytesWritten);
     }
 }
